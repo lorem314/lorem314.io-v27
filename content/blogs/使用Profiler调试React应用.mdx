@@ -1,0 +1,414 @@
+---
+title: "使用 Profiler 调试 React 应用"
+tags: ["React", "性能优化", "Profiler"]
+createdAt: "2024-02-06"
+summary: "本文介绍了如何使用浏览器中的 React Profiler 插件调试 React 页面应用程序，以及如何根据调试结果来优化渲染速度。"
+---
+
+本文通过构建一个用户列表 Demo，来讲解如何使用 React Profiler 工具来测试 React 页面的性能，以及如何使用 `React.memo` 和 `React.useCallback` 来提高性能。
+
+Demo 的初次实现，将不会使用任何性能优化策略，得到页面性能数据，之后，通过使用缓存策略，得到优化后的性能数据，对比前后性能数据，证实优化策略确实有效。
+
+## 构建项目
+
+通过 random-user 网站提供的 api，我们使用 fetch 方法来获取 100 个用户，展示用户头像，用户信息和一个关注按钮。
+
+使用 useState 来存放用户数组，同样用 useState 来存储已关注的用户的 id，同时还有一个输入框，用来根据名字筛选用户，页面样式如下。
+
+<Image
+  src="/images/blogs/使用Profiler调试React应用/react-profiler-001.webp"
+  width={978}
+  height={910}
+  alt=""
+/>
+
+本文使用 create-react-app 来初始化项目
+
+```shell
+npx create-react-app debug-with-profiler
+```
+
+完成后，文件结构如下
+
+```txt
+debug-with-profiler
+├─ node_modules
+├─ public
+├─ src
+│  ├─ components
+│  │  ├─ api.js
+│  │  ├─ FollowButton.jsx
+│  │  ├─ User.jsx
+│  │  └─ UserList.jsx
+│  ├─ App.css
+│  ├─ App.jsx
+│  ├─ App.test.js
+│  ├─ index.css
+│  ├─ index.js
+│  ├─ logo.svg
+│  ├─ reportWebVital.js
+│  └─ setupTests.js
+├─ .gitignore
+├─ package-lock.json
+├─ package.json
+└─ README.md
+```
+
+### API
+
+新建文件 `api.js`。定义一个 async 函数，通过 api 获取用户信息，同时使用 count 来设置想获取的用户数量。
+
+```jsx title="api.js"
+const getRandomUsers = async (count) => {
+  const data = await fetch(`https://api.randomuser.me/?nat=US&results=${count}`)
+  return await data.json()
+}
+
+export { getRandomUsers }
+```
+
+### 关注按钮
+
+```jsx
+import React from "react"
+
+const FollowButton = ({ isFollowing, onClick }) => {
+  return (
+    <button
+      className={`follow-button ${isFollowing && "is-following"}`}
+      onClick={onClick}
+    >
+      {isFollowing ? "取消关注" : "关注"}
+    </button>
+  )
+}
+
+export default FollowButton
+```
+
+### User 组件
+
+```jsx
+import React from "react"
+
+import FollowButton from "./FollowButton"
+
+const User = ({ user, followingIds, handleClickFollowButton }) => {
+  const isFollowing = followingIds.includes(user.login.uuid)
+  return (
+    <li className="user">
+      <img
+        width="72px"
+        height="72px"
+        src={user.picture.medium}
+        alt="user-avatar"
+      />
+      <div className="user-info">
+        <small>{user.login.uuid}</small>
+        <div>
+          Name : {user.name.title}. {user.name.first} {user.name.last}
+        </div>
+        <small>{user.email}</small>
+      </div>
+      <div className="actions">
+        <FollowButton
+          isFollowing={isFollowing}
+          onClick={handleClickFollowButton(user.login.uuid)}
+        />
+      </div>
+    </li>
+  )
+}
+
+export default User
+```
+
+### UserList 组件
+
+```jsx
+import React from "react"
+
+import User from "./User"
+
+const UserList = ({
+  users = [],
+  searchText = "",
+  followingIds = [],
+  handleClickFollowButton = () => {},
+}) => {
+  return (
+    <ul className="user-list">
+      {users.length === 0 ? (
+        <p>点击按钮获取用户</p>
+      ) : (
+        users
+          .filter((user) => {
+            if (searchText === "") return true
+            return (
+              user.name.first
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              user.name.last.toLowerCase().includes(searchText.toLowerCase())
+            )
+          })
+          .map((user) => {
+            return (
+              <User
+                key={user.login.uuid}
+                user={user}
+                followingIds={followingIds}
+                handleClickFollowButton={handleClickFollowButton}
+              />
+            )
+          })
+      )}
+    </ul>
+  )
+}
+
+export default UserList
+```
+
+### App 组件
+
+```jsx
+import React, { useState } from "react"
+
+import { getRandomUsers } from "./components/api"
+import UserList from "./components/UserList"
+import "./App.css"
+
+function App() {
+  const [users, setUsers] = useState([])
+  const [searchText, setSearchText] = useState("")
+  const [followingIds, setFollowingIds] = useState([])
+
+  const fetchUsers = () => {
+    getRandomUsers(100).then((data) => {
+      setUsers(data.results)
+    })
+  }
+
+  const handleSearchTextChange = (event) => {
+    setSearchText(event.target.value)
+  }
+
+  const handleClickFollowButton = (clickedId) => () => {
+    console.log("clicked ", clickedId)
+    followingIds.includes(clickedId)
+      ? setFollowingIds(followingIds.filter((id) => id !== clickedId))
+      : setFollowingIds([...followingIds, clickedId])
+  }
+
+  return (
+    <div className="app">
+      <h1>使用React Profile来调试性能</h1>
+      <button onClick={fetchUsers}>获取用户</button>
+      <br />
+      <input
+        type="search"
+        value={searchText}
+        onChange={handleSearchTextChange}
+      />
+      <UserList
+        users={users}
+        searchText={searchText}
+        followingIds={followingIds}
+        handleClickFollowButton={handleClickFollowButton}
+      />
+    </div>
+  )
+}
+
+export default App
+```
+
+## 测试性能
+
+刷新页面，点击获取用户，渲染了 100 名用户，开始 profiler，随便点击几个用户的关注按钮，点击过的用户的按钮文字从关注变为取消关注，代表用户 id 确实被加进了 followingIds 数组里，停止 profiler，得到结果。
+
+<Image
+  src="/images/blogs/使用Profiler调试React应用/react-profiler-002.webp"
+  width={1894}
+  height={349}
+  alt=""
+/>
+
+我一共点击了 5 个用户，每次点击都会触发 App 组件的重新渲染，profiler 的右上角标有 `1/5` 文字的右边有 5 个带颜色的方块，每个方块代表一次渲染结果，点击后可在下方显示每次渲染的组件。
+
+点击下方的标有 App 的长条，最右边的栏中得到这 5 次渲染中，App 组件的渲染用时，5 次中最慢约为 40 毫秒，最快约为 22 毫秒。
+
+<Image
+  src="/images/blogs/使用Profiler调试React应用/react-profiler-003.webp"
+  width={321}
+  height={200}
+  alt=""
+/>
+
+黄色条为 UserList 组件，渲染用时约为 37 毫秒，再往下每个小块是 User 组件，最下面是 FollowButton 组件。User 组件的长条颜色为浅绿色，出现了很多次（100 次），代表每次 App 组件重新渲染后，每个 User 组件也都触发了重新渲染。
+
+但我们只点击了 5 个用户，逻辑上来说，需要改动的只应该是这 5 个用户，其他用户的 User 组件不需要跟着渲染，这正是所谓的非必要渲染(uncessary rendering)，我们需要使用优化策略来避免这种情况。
+
+## 实施优化
+
+首先，最需要优化的就是 User 组件的渲染，点击某一个 User 组件里关注按钮后，所有的 User 组件都会跟着更新，很显然其他 99 个用户没有必要跟着更新。
+
+第一个想法就是用 React.memo 把 User 组件在导出时包起来，像这样：
+
+```jsx
+export default React.memo(User)
+```
+
+这样能保证，User 组件的 props 的值和上一次渲染时相比，若没有发生变化，直接使用上一次的渲染结果，避免重新渲染，而实际正是如此，其他 99 个 User 组件的 props 都没有变化，唯一变化的就是点击了关注按钮的 User 组件的 `isFollowing` 由 `false` 变为了 `true`。
+
+此时再重新测试一遍渲染性能，结果可能并不会很理想。
+
+<Image
+  src="/images/blogs/使用Profiler调试React应用/react-profiler-004.webp"
+  width={328}
+  height={197}
+  alt=""
+/>
+
+每次渲染还都是保持再 20 毫秒之上。
+
+有一篇博客中有提到过，使用优化策略时要谨慎，错误地实施优化策略有时并不能带来好处，反而会降低性能。
+
+回看 User 组件，传入的 props 有 3 个：
+
+- user
+- followingIds
+- handleClickFollowButton
+
+user 变量是 users 数组通过 map 遍历获得的，再通过 fetchUsers 函数获取过 100 个用户信息后，users 数组不会发生改动，故遍历获得的 user 也不会改动，user 的值在每次重新渲染中是保持不变的。
+
+followingIds 数组，从 App 组件一路传下来，每关注一个用户，就把该用户的 user.login.uuid 的值放入其中，所以该数组在每次重新渲染中都是会变化的。
+
+followingIds 数组用于计算该是否关注过该用户，以此来区分显示按钮中的文字。我们可以不把 followingIds 传递到 User 组件中，在 UserList 中对 users 进行 map 时就计算好，isFollowing 的值。
+
+```jsx
+const UserList = ({
+  users = [],
+  searchText = "",
+  followingIds = [],
+  handleClickFollowButton = () => {},
+}) => {
+  return (
+    <ul className="user-list">
+      {users.length === 0 ? (
+        <p>点击按钮获取用户</p>
+      ) : (
+        users
+          .filter((user) => {
+            if (searchText === "") return true
+            return (
+              user.name.first
+                .toLowerCase()
+                .includes(searchText.toLowerCase()) ||
+              user.name.last.toLowerCase().includes(searchText.toLowerCase())
+            )
+          })
+          .map((user) => {
+            const isFollowing = followingIds.includes(user.login.uuid)
+            return (
+              <User
+                key={user.login.uuid}
+                user={user}
+                isFollowing={isFollowing}
+                handleClickFollowButton={handleClickFollowButton}
+              />
+            )
+          })
+      )}
+    </ul>
+  )
+}
+```
+
+同时将 User 组件中接收的 followingIds 参数改为 isFollowing，接收的 isFollowing 直接传入到 FollowButton 组件。
+
+此时，isFollowing 在 User 组件渲染前就已经计算好了，其余 99 个用户在重新渲染时该值仍会为 false。
+
+最后是 handleClickFollowButton，这是一个函数引用，在组件中定义的函数在每次组件重新渲染时都会重新生成，这也正是 `()⇒{} !== ()⇒{}` 的原因。
+
+handleClickFollowButton 是在 App 组件中定义的，是一个高阶函数，react 为避免函数在重新渲染时重新构建，特意准备了 React.useCallback 函数。
+
+和 useEffect 的参数相同，useCallback 也接受一个回调函数和一个依赖数组，useCallback 函数的返回值就是该回调函数本身，只有在和上一次渲染时依赖数组中的值发生变化时，才会重新返回该回调函数。
+
+同时 handleClickFollowButton 函数在执行中涉及到了 followingIds 数组，需要将 followingIds 添加到 useCallback 的依赖数组中，否则 react 会提示以下警告：
+
+> React Hook useCallback has a missing dependency: 'followingIds'. Either include it or remove the dependency array. You can also do a functional update 'setFollowingIds(f => ...)' if you only need 'followingIds' in the 'setFollowingIds' call react-hooks/exhaustive-deps
+
+然而不添加的话，程序也不会正常执行，由于 react 组件严重依赖于闭包，每次重新渲染时，发生改动的 useState 的值都会是一个新创建的变量，这也是为什么在 react 改变 state 时需要用到 filter、map 等会返回新引用的函数，而非 push、shift 和 forEach 等直接在原数组上做改动的函数。
+
+如果不添加，程序会有以下诡异的行为：第一次点击关注按钮，被点击的用户的按钮文字由关注变为取消关注，代表成功关注了该用户；第二次点击另外一个用户的关注按钮时，第一次点击的用户的按钮变回了关注，第二次点击的用户的按钮变成了取消关注，就好像我们从未关注过第一位用户一样。
+
+这是因为，由于 useCallback 没有将 followingIds 添加到依赖数组，useCallback 函数只会在 App 组件初次渲染时将回调函数返回给 handleClickFollowButton，此时的 followingIds 是一个空数组；点击了按钮之后，下一次渲染中，useCallback 的依赖数组为空，还将第一次渲染时的回调函数赋值给 handleClickFollowButton，上一次渲染中的 followingIds（空数组）的值，仍然可以在 handleClickFollowButton 中访问得到，所以，第二次点击按钮时，是将第二次点击的 id 添加到空数组中，得到长度为 1 的数组，赋值给了第二次渲染中的 followingIds。
+
+```jsx
+const handleClickFollowButton = useCallback(
+  (clickedId) => () => {
+    followingIds.includes(clickedId)
+      ? setFollowingIds(followingIds.filter((id) => id !== clickedId))
+      : setFollowingIds([...followingIds, clickedId])
+  },
+  [followingIds], // highlight-line
+)
+```
+
+将 followingIds 添加到 useCallback 的依赖数组中后，我们再来测试以下性能。
+
+<Image
+  src="/images/blogs/使用Profiler调试React应用/react-profiler-005.webp"
+  width={327}
+  height={190}
+  alt=""
+/>
+
+将渲染降到了 20 毫秒以下。
+
+我们再来仔细想一想 🤔，每次点击按钮后，followingIds 的值必然会改变，因为点击事件将 user.login.uuid 添加进了该数组，所以 App 组件在渲染重新渲染时，useCallback 还是会由于 followingIds 值的改变而重新返回回调函数，handleClickFollowButton 在每次重新渲染中的值还是不同的。
+
+我们还能如何进行优化呢？
+
+useState 函数返回的 setter 函数，还可以传入函数，进行状态变化。
+
+```jsx
+const [count, setCount] = useState(0)
+
+setCount((prevCount) => {
+  return prevCount + 1
+})
+```
+
+传入到 setter 中的函数的返回值，会作为下一次状态的结果使用。
+
+```js
+const handleClickFollowButton = useCallback(
+  (clickedId) => () => {
+    // highlight-start
+    setFollowingIds((prevFollowingIds) => {
+      return prevFollowingIds.includes(clickedId)
+        ? prevFollowingIds.filter((id) => id !== clickedId)
+        : [...prevFollowingIds, clickedId]
+    })
+    // highlight-end
+  },
+  [],
+)
+```
+
+通过使用函数的方式，先判断上一次的 followingIds 数组——prevFollowingIds 中是否含有被点击的用户的 id，根据不同情况，分别返回移除或添加后的新数组，此时 useCallback 函数中只涉及到了由 useState 函数返回的 setFollowingIds 函数，该函数是不会改变的，可以将依赖数组中的 followingIds 删除了，此时，handleClickFollowButton 函数只会在初次渲染被 useCallback 函数的返回结果赋值，之后的重新渲染中不会再次被赋值。
+
+在来测试性能，均保持在 5 毫秒之内。
+
+<Image
+  src="/images/blogs/使用Profiler调试React应用/react-profiler-006.webp"
+  width={327}
+  height={197}
+  alt=""
+/>
+
+## 参考文章
+
+- [Use React.memo() wisely](https://dmitripavlutin.com/use-react-memo-wisely)

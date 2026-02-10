@@ -1,0 +1,148 @@
+---
+title: "JS 中的可执行对象"
+tags: ["JavaScript"]
+createdAt: "2026-01-11"
+summary: "在 JavaScript 中，可执行对象（Callable Object，也称为可调用对象或函数式对象）是指既能像函数一样被直接调用，又能带有属性的对象。这种对象结合了函数的可调用性和普通对象的状态保持能力，特别适合需要携带状态、配置或上下文的场景。"
+---
+
+在使用 styled-components 时，我发现 styled 函数既能像对象一样，访问其中的某个属性：
+
+```jsx
+// 调用 button 属性，button 是函数
+const Wrapper = styled.button`
+  // css
+`
+```
+
+又能像函数一样，接收参数：
+
+```jsx
+// 接受 Button 组件后，再调用
+const RedButton = styled(Button)`
+  color: red;
+`
+```
+
+这种叫做**可执行对象**(Callable Object)。由于 JS 中万物皆对象，可以通过几种方式来创建这种类型的对象。
+
+## 经典方式：闭包+附加属性
+
+这是最常见也最易理解的方式：返回一个函数，并在函数上附加属性（getter/setter）来管理状态。
+
+```js
+function createGreeter() {
+  let salutation = "Hello" // 内部状态
+
+  function greeter(subject) {
+    return `${salutation}, ${subject}!`
+  }
+
+  // 附加访问器方法
+  greeter.setSalutation = function (newSal) {
+    if (arguments.length > 0) {
+      salutation = newSal
+    }
+    return this // 支持链式调用
+  }
+
+  greeter.getSalutation = function () {
+    return salutation
+  }
+
+  return greeter
+}
+```
+
+```jsx
+const hello = createGreeter()
+hello.setSalutation("Hi")
+console.log(hello("world")) // Hi, world!
+console.log(hello.getSalutation()) // Hi
+
+// 可直接作为回调使用
+const names = ["Alice", "Bob"]
+console.log(names.map(hello)) // ['Hi, Alice!', 'Hi, Bob!']
+```
+
+**优点**：
+
+- 简单、直观，无需 ES6+ 特性
+- 状态完全封闭在闭包中，安全
+- 性能好
+
+**缺点**：
+
+- 附加的属性（如 `setSalutation`）只能通过点语法访问，无法直接像普通函数那样 `hello.salutation = 'Hi'`（除非再做一层代理）
+
+## 现代方式：Proxy+类继承
+
+ES6 的 `Proxy` 可以拦截函数调用，结合 `class extends Function` 可以创建真正的“可调用对象”，让对象既能被调用，又能像普通对象一样设置属性。
+
+```js
+class Callable extends Function {
+  constructor() {
+    super() // 必须调用 super() 来让它成为函数
+
+    // 返回 Proxy 代理自身，拦截调用
+    return new Proxy(this, {
+      apply: (target, thisArg, args) => {
+        // 当对象被调用时，执行自定义的 _call 方法
+        return target._call(...args)
+      },
+    })
+  }
+
+  // 子类重写这个方法来定义调用行为
+  _call(...args) {
+    throw new Error("请在子类中实现 _call 方法")
+  }
+}
+
+class Greeter extends Callable {
+  constructor() {
+    super()
+    this.salutation = "Hello" // 直接作为实例属性
+  }
+
+  _call(subject) {
+    return `${this.salutation}, ${subject}!`
+  }
+
+  setSalutation(newSal) {
+    this.salutation = newSal
+    return this
+  }
+}
+```
+
+```js
+const hi = new Greeter()
+hi.setSalutation("Hi")
+console.log(hi("world")) // Hi, world!
+
+// 仍然可以像普通对象一样操作
+hi.salutation = "Hey"
+console.log(hi("Alice")) // Hey, Alice!
+
+// 作为回调
+const names = ["Bob", "Charlie"]
+console.log(names.map(hi)) // ['Hey, Bob!', 'Hey, Charlie!']
+```
+
+**工作原理**：
+
+- `class extends Function` 让实例本身具备函数的基本能力
+- Proxy 的 apply trap 拦截 hi(...) 这样的调用，转发到 \_call 方法
+- this 在 \_call 中指向实例本身，因此可以直接访问/修改实例属性
+
+**优点**：
+
+- 更自然：可以直接 `obj.prop = value` 修改状态
+- 支持继承和扩展
+- 更接近面向对象风格
+
+**缺点**：
+
+- 需要 Proxy，在极老旧环境不支持（但现代浏览器/Node 都支持）
+- Proxy 有轻微性能开销（通常可忽略）
+- 调试时可能稍复杂（Proxy 会隐藏一些栈信息）

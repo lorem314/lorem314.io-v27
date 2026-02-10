@@ -1,0 +1,331 @@
+---
+title: "使用 PropTypes 进行类型检查"
+tags: ["React", "PropTypes"]
+createdAt: "2022-09-23"
+summary: ""
+---
+
+在向 React 组件中传递变量时，明确该变量的类型十分重要。若组件接收了错误的类型参数，可能会导致程序出错。
+
+由于 JavaScript 中没有内置的类型检查机制，很多开发者使用 TypeScript 或 Flow 来保证参数的类型正确，而 React 中有 `PropTypes`，是一个专门用于规定组件参数的机制。
+
+## 安装依赖
+
+在 React 文档中指出，`React.PropTypes` 已经于 15.5.0 之后的版本中移除到了名为 prop-types 单独的代码包中。
+
+我们可以使用如下代码来安装：
+
+```bash
+npm install --save prop-types
+```
+
+之后便可以在项目中引入，进而使用：
+
+```jsx
+import PropTypes from "prop-types"
+```
+
+## 定义类型
+
+目前 React 中有两种定义组件的方法，一种是函数组件，一种是类组件。（至于 `React.createElement` ，已被弃用）
+
+```jsx
+// 函数组件
+function ReactComponent(props) {
+  return null
+}
+ReactComponent.propTypes = {
+  // 定义参数类型
+}
+
+// 类组件 方法 1
+class ReactComponent extends React.Component {
+  render() {
+    return null
+  }
+}
+ReactComponent.propTypes = {
+  // 定义参数类型
+}
+
+// 类组件 方法 2
+class ReactComponent extends React.Component {
+  static propTypes = {
+    // 定义参数类型
+  }
+}
+```
+
+当组件被调用时，会触发类型检查，控制台中会输出警告。
+
+## 类型检查
+
+`PropTypes` 中提供了很多用于规定类型的方法。这些类型可以是 JavaScript 中的原始类型或通过 new 关键字实例化的类对象、或是由特定类型元素组成的 Array 和特定类型的属性组成的 Object、或是 JSX 中新增的能被渲染成 HTML 的类型、或是规定参数的值只能为某些特定值和枚举类型，最后还提供了可自定义的类型。
+
+### 基础类型
+
+下面是一些常用的基础数据类型：
+
+- `PropTypes.bool`：布尔类型，`true` 或 `false`
+- `PropTypes.number`：数字类型，如 `114514` 或 `3.14159`
+- `PropTypes.string`：字符串类型，如 `'Greetings'` 或 `'Error: this type is not expected'`
+- `PropTypes.func`：函数类型，如一个空函数 `()⇒{}`，或`(event) ⇒ { setValue(event.target.value) }`
+- `PropTypes.array`：数组类型，如 `[1, 'deux', 'three', 'よん', ()=>'五']`
+- `PropTypes.object`：对象类型，如 `{ name: 'Jojo', age: 18}`
+- `PropTypes.symbol`：symbol类型，如 `Symbol(42)`，或 `Symbol.for('react.element')`
+
+除了上述的7中类型，还可以是任意类型
+
+- `PropTypes.any`：可以是任意一种类型
+
+```jsx
+MyComponent.propTypes = {
+  booleanProp: PropTypes.bool,
+  numberProp: PropTypes.number,
+  stringProp: PropTypes.string,
+  functionProp: PropTypes.func,
+  arrayProp: PropTypes.array,
+  objectPerop: PropTypes.object,
+  symbolProp: PropTypes.symbol,
+  anyProp: PropTypes.any,
+}
+```
+
+### 可渲染类型
+
+- `PropTypes.node`：如number、string、元素或是包含上述类型的数组或空标签，等可以被渲染的类型。
+- `PropTypes.element`：只能是 React 元素，即 JSX
+
+```jsx
+Component.propTypes = {
+  nodeProp: PropTypes.node,
+  elementProp: PropTypes.element,
+}
+```
+
+`PropTypes.element` 的一个常用场景是，确保组件只有一个子组件。
+
+```jsx
+Component.propTypes = {
+  children: PropTypes.element.isRequired,
+}
+```
+
+### 实例类型
+
+用于检查值是否为特定类的实例。
+
+```jsx
+Component.propTypes = {
+  personProp: PropTypes.instanceOf(Person),
+}
+```
+
+### 多选一类型
+
+用于对属性的值进行规定。
+
+- `PropTypes.oneOf`：规定参数的值只能是给定的值中的一种，和枚举类型类似
+- `PropTypes.oneOfType`：规定参数的类型只能是给定的类型中的一种
+
+```jsx
+Component.propTypes = {
+  enumProp: PropTypes.oneOf([true, false, 0, "Unknown"]),
+
+  unionProp: PropTypes.oneOfType([
+    PropType.bool,
+    PropType.number,
+    PropType.string,
+    PropType.instanceOf(Person),
+  ]),
+}
+```
+
+### 集合类型
+
+我们还可以针对元素中的元素和Object中的属性规定类型。
+
+#### PropTypes.arrayOf
+
+规定了数组中的元素的类型
+
+```jsx
+Component.propTypes = {
+  peopleArrayProp: PropTypes.arrayOf(PropTypes.instanceOf(Person)),
+
+  multipleArrayProp: PropTypes.arrayOf(
+    PropTypes.oneOfType([PropType.number, PropType.string]),
+  ),
+}
+```
+
+#### PropTypes.objectOf
+
+规定了 Object 中的属性的类型
+
+```jsx
+Component.propTypes = {
+  booleanObjectProp: PropTypes.objectOf(PropTypes.bool),
+
+  multipleObjectProp: PropTypes.objectOf(
+    PropTypes.oneOfType([
+      PropType.func,
+      PropType.number,
+      PropType.string,
+      PropType.instanceOf(Person),
+    ]),
+  ),
+}
+```
+
+#### PropTypes.shape
+
+适用于更加精确的 Object 属性，规定一个 Object 属性中的属性名和属性类型
+
+```jsx
+Component.propTypes = {
+  profileProp: PropTypes.shape({
+    id: PropTypes.number,
+    fullname: PropTypes.string,
+    gender: PropTypes.oneOf(["M", "F"]),
+    birthdate: PropTypes.instanceOf(Date),
+    isAuthor: PropTypes.bool,
+  }),
+}
+```
+
+#### PropTypes.exact
+
+类型检查默认情况下，不对没有在其中列出的属性进行检查，即默许可以出现没有列出在其中的属性。而该方法在出现多余参数时给出警告
+
+```jsx
+Component.propTypes = {
+  subjectScoreProp: PropTypes.exact({
+    subject: PropTypes.oneOf(["Maths", "Arts", "Science"]),
+    score: PropTypes.number,
+  }),
+}
+```
+
+#### 必要类型
+
+之上所有的提及的属性都是可选的，即可提供可不提供。我们可在其之后加上 `isRequired` 来在没有提供该参数的值时给出警告
+
+```jsx
+Component.propTypes = {
+  requiredAnyProp: PropTypes.any.isRequired,
+  requiredFunctionProp: PropTypes.func.isRequired,
+  requiredSingleElementProp: PropTypes.element.isRequired,
+  requiredPersonProp: PropTypes.instanceOf(Person).isRequired,
+  requiredEnumProp: PropTypes.oneOf(["Read", "Write"]).isRequired,
+
+  requiredShapeObjectProp: PropTypes.shape({
+    title: PropTypes.string.isRequired,
+    date: PropTypes.instanceOf(Date).isRequired,
+    isRecent: PropTypes.bool,
+  }).isRequired,
+}
+```
+
+### 自定义类型检查
+
+#### 基础类型检查
+
+自定义验证函数接收 3 个参数：
+
+- props：一个Object，包含了所有传入组件的参数
+- propName：当前检测的参数名
+- componentName：组件名
+
+若验证出错，应该返回一个 new Error 实例，而非 throw Error。另外，也不应该在该函数中使用 `console.warn` 来输出错误。
+
+```jsx
+const isEmail = function(props, propName, componentName) {
+  const regex = /^((([^<>()[]\.,;:s@"]+(.[^<>()[]\.,;:s@"]+)*)|(".+"))@(([[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}])|(([a-zA-Z-0-9]+.)+[a-zA-Z]{2,})))?$/;
+
+  if (!regex.test(props[propName])) {
+    return new Error(`Invalid prop `${propName}` passed to `${componentName}`. Expected a valid email address.`);
+  }
+}
+
+Component.propTypes = {
+  email: isEmail,
+  fullname: PropTypes.string,
+  date: PropTypes.instanceOf(Date)
+}
+```
+
+还可以将自定义函数和内置函数一起使用：
+
+```jsx
+Component.propTypes = {
+  email: PropTypes.oneOfType([
+    isEmail,
+    PropTypes.shape({
+      address: isEmail,
+    }),
+  ]),
+}
+```
+
+向组件提供的 email 参数通过自定义函数 isEmail 或内置 PropTypes.shape 其中一个验证即可，即下面两种写法均可以
+
+```jsx
+<Component email="glad@me.com" />
+<Component email={{ address: 'glad@me.com' }} />
+```
+
+#### 检查自定义集合类型
+
+同样，我们也可以在 `PropTypes.arrayOf` 和 `PropTypes.objectOf` 中使用自定义函数。这种情况下，自定义函数会遍历数组或Object中的每个元素或属性。
+
+此时，自定义函数接收 5 个参数，而不是 3 个。
+
+- propValue：数组或 Object 本身
+- key：当前遍历的键
+- componentName：组件名
+- location：通常为prop
+- propFullName：全名。对数组来说是array[index]；对Obejct来说是object.key。
+
+```jsx
+const isEmail = function(propValue, key, componentName, location, propFullName) {
+  const regex = /^((([^<>()[]\.,;:s@"]+(.[^<>()[]\.,;:s@"]+)*)|(".+"))@(([[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}])|(([a-zA-Z-0-9]+.)+[a-zA-Z]{2,})))?$/;
+
+  if (!regex.test(propValue[key])) {
+    return new Error(`Invalid prop `${propFullName}` passed to `${componentName}`. Expected a valid email address.`);
+  }
+}
+
+Component.propTypes = {
+  emails: PropTypes.arrayOf(isEmail)
+}
+```
+
+#### 自定义通用验证函数
+
+结合前面所讲的，让我们来创建一个既可以用于单独验证，又可以用于 `oneOfType` 等方法中的通用函数。
+
+只要稍加修改，`isEmail` 函数便可以应用与各种场合。
+
+```jsx
+const isEmail = function(propValue, key, componentName, location, propFullName) {
+  // Get the resolved prop name based on the validator usage
+  const prop = (location && propFullName) ? propFullName : key;
+
+  const regex = /^((([^<>()[]\.,;:s@"]+(.[^<>()[]\.,;:s@"]+)*)|(".+"))@(([[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}.[0-9]{1,3}])|(([a-zA-Z-0-9]+.)+[a-zA-Z]{2,})))?$/;
+
+  if (!regex.test(propValue[key])) {
+    return new Error(`Invalid prop `${prop}` passed to `${componentName}`. Expected a valid email address.`);
+  }
+}
+
+Component.propTypes = {
+  email: PropTypes.oneOfType([
+    isEmail,
+    PropTypes.shape({
+      address: isEmail
+    })
+  ]),
+  emails: PropTypes.arrayOf(isEmail)
+}
+```

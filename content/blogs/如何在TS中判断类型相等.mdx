@@ -1,0 +1,109 @@
+---
+title: "如何在 TS 中判断类型相等"
+tags: ["TypeScript"]
+createdAt: "2025-08-14"
+summary: "在 TS 类型系统中，判断两个类型是否相等是一个常见但棘手的需求。extends 关键字只能检查可赋值性，但在许多场景下，我们需要更严格的身份相等判断。本文结合 StackOverflow 上的两个经典讨论，讲解目前最可靠的类型相等判断函数 Equal。"
+---
+
+## 为什么 `extends` 不够用？
+
+在学习 TS 的初期，你很可能听到过：如果 A extends B，说明 A 是 B 的子集。
+
+例如：
+
+```ts
+type Result = true extends boolean ? "1" : "0"
+```
+
+`Result` 的值为 `"1"`，说明 true 是 boolean 的子集，事实也正是如此。
+
+两个类型互为子集，即可证明两者相等。这是数学中的概念。
+
+TS 中的 extends 检查的是`互赋值性`(mutual assignability)。但有时也会把本多*可赋值但不完全相同*的类型判断为 `true`：
+
+```ts
+type A = NaiveEqual<{ a?: number }, {}>
+//   ^? true（但语义上不应该相等）
+
+type B = NaiveEqual<{ bar: number }, { readonly bar: number }>
+//   ^? true（readonly 被忽略）
+
+type C = NaiveEqual<{ x: 1 } & { y: 2 }, { x: 1; y: 2 }>
+//   ^? true（交集类型被视为等价）
+```
+
+这些情况下，两个类型在运行时行为一致，但 TS 编译器内部*并不*认为它们*相同*（例如 flags 不同、readonly 标记不同、intersection 类型标记等）。
+
+## 用泛型函数类型作为指纹
+
+判断类型是否完全相等的可靠方案，是利用泛型函数类型的赋值规则，构造一个黑盒函数类型作为类型的唯一指纹：
+
+```ts
+type Equal<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
+    ? true
+    : false
+```
+
+也可以写成更清晰的形式：
+
+```ts
+type BlackBox<T> = <U>() => U extends T ? 1 : 2
+
+type Equal<X, Y> = BlackBox<X> extends BlackBox<Y> ? true : false
+```
+
+这就变成了检查 `BlackBox<X>` 是否可赋值给 `BlackBox<Y>`。
+
+### 工作原理
+
+TS 在判断函数类型是否可赋值时，会执行函数类型兼容性检查。
+
+规则可简要概括为：
+
+- 泛型参数数量、约束必须匹配（这里都是一个无约束的 T）。
+- 参数列表兼容（这里都是空）。
+- 返回类型必须兼容：`BlackBox<X>` 的返回类型在 `BlackBox<Y>` 的上下文中必须是可赋值的。
+
+关键就在检查返回类型是否兼容这一步：它们都是条件类型。
+
+TS 在检查两个条件类型是否兼容时，会模拟*对于所有可能的 T，返回类型是否一致*。
+
+- 如果 `X` 和 `Y` 完全相同，那么 `T extends X ? 1 : 2` 和 `T extends Y ? 1 : 2` 就是同一个类型，兼容。
+- 如果 A ≠ B，编译器会尝试证明是否存在矛盾。
+
+矛盾的证明方式：是否存在某个类型 `T`，使得在 `BlackBox<X>` 中返回 `1`，但在 `BlackBox<Y>` 中返回 `2`（或反之）？
+
+- 假设 `X` 和 `Y` 不完全相同，那么几乎总是存在这样的 `T`
+  - 例如 `X = { a: number }`，`Y = { readonly a: number }` → 取 `T = { a: number }`，`T extends X` → true → 返回 1 但 T extends Y → false（因为缺少 readonly）→ 返回 2 → 矛盾！
+  - 再如 `X = number`，`Y = string` → 取 `T = number`，`T extends number` → 1，但在 `Y` 中 → 2
+  - 甚至 `X = { a?: number }`，`Y = {}` → 取 `T = { a: string }`，`T extends {}` → true → 1，但 `T extends { a?: number }` → false → 2
+
+只要存在一个这样的 T 导致返回类型不同（1 vs 2），函数类型就*不安全可赋值*。
+
+## 实际测试案例
+
+```ts
+// 基本类型
+type Eq1 = Equal<number, number> // true
+type Eq2 = Equal<number, string> // false
+
+// 对象字面量
+type Eq3 = Equal<{ a: number }, { a: number }> // true
+type Eq4 = Equal<{ a: number }, { readonly a: number }> // false（readonly 不同）
+
+// 可选属性 vs 空对象
+type Eq5 = Equal<{ a?: number }, {}> // false（不像 naive 那样 true）
+
+// 交集类型 vs 合并对象
+type Eq6 = Equal<{ x: 1 } & { y: 2 }, { x: 1; y: 2 }> // false（intersection flag 不同）
+
+// 元组 vs 数组
+type Eq7 = Equal<[1, 2], [1, 2]> // true
+type Eq8 = Equal<[1, 2], number[]> // false
+```
+
+## 参考文章
+
+- [Generic arrow functions in conditional types](https://stackoverflow.com/questions/75699574/generic-arrow-functions-in-conditional-types/75699960#75699960)
+- [How does the `Equals` work in typescript?](https://stackoverflow.com/questions/68961864/how-does-the-equals-work-in-typescript)

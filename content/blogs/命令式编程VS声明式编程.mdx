@@ -1,0 +1,250 @@
+---
+title: "命令式编程 VS 声明式编程"
+tags: ["声明式编程"]
+createdAt: "2024-09-23"
+summary: "本文通过编写两个简单的程序来比较命令式编程和声明式编程的不同。"
+---
+
+## 函数式编程
+
+声明式编程属于函数式编程里的一类。从其名字中就可以看出，这类编程需要大量地依赖和使用函数，定义一个函数就像定义一个变量一样平常，倒不如说在 JS 中，函数就可以看作一个变量。
+
+其原因是，JS 中的函数是一等公民(first-class citizen)，这意味着函数可以被看作成变量，被传入另一个函数，或被函数当作值返回。有了 ES6 语法的加持，使用箭头函数、promise 和剩余参数可以极大提高函数式编程的使用效率。
+
+## 命令式 VS 声明式
+
+声明式编程倾向于描述程序执行的顺序，或是说按照何种顺序执行，而非定义其该如何发生。
+
+我们再来看一个例子，将一个字符串转化为URL兼容字符串。
+
+简单来说，我们可以把所有的空格替换为连字符，以下是命令式的写法：
+
+```jsx
+var string = "This is the mid day show with Cheryl Waters"
+var urlFriendly = ""
+
+for (var i = 0; i < string.length; i++) {
+  if (string[i] === "") {
+    urlFriendly += "-"
+  } else {
+    urlFriendly += string[i]
+  }
+}
+
+console.log(urlFriendly)
+```
+
+我们使用一个循环来遍历字符串，如果是字符则不做处理，原封不动地加到urlFriendly字符串地末尾，如果是空格，则添加连字符。
+
+我们再来看一下声明式的写法：
+
+```jsx
+const string = "This is the mid day show with Chery Waters"
+const urlFriendly = string.replace(/ /g, "-")
+
+console.log(urlFriendly)
+```
+
+通过使用string.replace方法和正则表达式来替换所有的空格。
+
+如果你觉得上述的例子不是很能够展现两种写法的不同（确实，我当时看的时候也没理解，不就是用了个内置函数么…😓），那我们再来看另外一个例子。
+
+## 时钟 Demo
+
+任务很简单，就是再控制台中输出当前时间，并且每秒刷新。输出的格式为12小时制，数字为一位数时要加上前缀0，且要在末尾加上am或pm来表示上午还是下午。如：上午”05:26:52 am”，下午”09:12:55 pm”
+
+### 命令式写法
+
+同样，我们先来看看命令式的写法：
+
+```jsx
+setInterval(logClockTime, 1000)
+```
+
+每秒调用setInterval，执行一次logClockTime函数，在控制台中输出时间。
+
+```jsx
+function logClockTime() {
+  // 获取时间
+  var time = getClockTime()
+
+  // 清除控制台并输出时间
+  console.clear()
+  console.log(time)
+}
+```
+
+logClockTime函数中，先使用getClockTime函数获取时间字符串，清空控制台并输出，并输出时间。由getClockTime函数做所有的事，从实例化Date对象到格式化字符串。
+
+```jsx
+function getClockTime() {
+  // 初始化时间
+  var date = new Date()
+  var time = {
+    hours: date.getHours(),
+    minutes: date.getMinutes(),
+    seconds: date.getSeconds(),
+    ampm: "AM",
+  }
+
+  // 转换为12小时制
+  if (time.hours == 12) {
+    time.ampm = "PM"
+  } else if (time.hours > 12) {
+    time.ampm = "PM"
+    time.hours -= 12
+  }
+
+  // 在小时前添加前缀0
+  if (time.hours < 10) {
+    time.hours = "0" + time.hours
+  }
+
+  // 在分钟前添加前缀0
+  if (time.minutes < 10) {
+    time.minutes = "0" + time.minutes
+  }
+
+  // 在秒前添加前缀0
+  if (time.seconds < 10) {
+    time.seconds = "0" + time.seconds
+  }
+
+  // 格式化时间字符串
+  return time.hours + ":" + time.minutes + ":" + time.seconds + " " + time.ampm
+}
+```
+
+这种写法非常直观，且能运行，有了注释能帮助我们之后再次重审代码时理解这一(长)段代码做了什么，或是帮助其他查看这段代码的人来理解。然而，尤其是getClockTime函数，在逻辑上做了很多事情，几乎所有事情都是它完成的，初次查看的人可能需要一段时间才能弄清这段代码做了什么。虽说从函数的名字getClockTime能大致理解该函数的意图，但这种占用大篇幅的代码的另外的缺点是可维护性差，扩展性差。
+
+我们需要将整个逻辑分成多个小块，每个小块对应一个函数，专注于一个逻辑，只做一件事。最后，我们在将所有的小块整合到一起。
+
+### 声明式写法
+
+接下来是声明式的写法，我们先来定义一些函数：
+
+```jsx
+const oneSecond = () => 1000
+const getCurrentTime = () => new Date()
+const clear = () => console.clear()
+const log = (message) => console.log(message)
+```
+
+- oneSecond 函数只返回一个数，1000（毫秒）
+- getCurrentTime 函数返回Date的一个实例
+- clear 清空控制台
+- log 向控制台输出参数message
+
+下面再来定义一些函数，帮助我们转换数据类型。
+
+```jsx
+const serializeClockTime = (date) => ({
+  hours: date.getHours(),
+  minutes: date.getMinutes(),
+  seconds: date.getSeconds(),
+})
+
+const appendAMPM = (clockTime) => ({
+  ...clockTime,
+  ampm: clockTime.hours >= 12 ? "PM" : "AM",
+})
+
+const civilianHours = (clockTime) => ({
+  ...clockTime,
+  hours: clockTime.hours > 12 ? clockTime.hours - 12 : clockTime.hours,
+})
+```
+
+- serializeClockTime 将Date实例转换为一个object，其中有指示时间的属性。为了方便，后文中我们将该函数返回的object称作clockTime类型。
+- appendAMPM 根据clockTime类型中的hours属性的值，判断是上午还是下午，并添加ampm属性。
+- civilianHours 将24小时制转换为12小时制。
+
+这三个函数均为纯函数，没有引发sideEffect。
+
+接下来，我们定义几个高阶函数：
+
+```jsx
+const display = (targetFn) => (time) => targetFn(time)
+
+const formatClock = (template) => (clockTime) =>
+  template
+    .replace("hh", clockTime.hours)
+    .replace("mm", clockTime.minutes)
+    .replace("ss", clockTime.seconds)
+    .replace("tt", clockTime.ampm)
+
+const prependZero = (key) => (clockTime) => ({
+  ...clockTime,
+  [key]: clockTime[key] < 10 ? "0" + clockTime[key] : clockTime[key],
+})
+```
+
+- display 接受一个目标函数，返回另一个函数，并将该函数的参数传给目标函数去执行。
+- formatClock 接受一个模板字符串”hh:mm:ss tt“，在后面转化时使用replace将对应位置换成对应数字。
+- prependZero 给个位数字添加前缀0
+
+这些高阶函数将会再执行前接受一个参数，方便格式化时间时使用，他们返回的函数将会每秒调用一次，用于格式化时间并输出。
+
+我们有了所有的逻辑小块，如何将它们整合到一起呢？我们引入compose函数
+
+```jsx
+const compose =
+  (...fns) =>
+  (arg) =>
+    fns.reduce((value, fn) => fn(value), arg)
+```
+
+该函数使用剩余参数，将参数转为数组fns，并返回另一个函数。返回的函数又接受一个参数，并返回fns.reduce的返回值。
+
+fns.reduce执行给行的回调函数(value, fn) => fn(value)，简单来说，value代表fns中的第一个元素，fn代表fns中的第二个元素，这里给出了arg参数，意味着arg将作为数组中第一个元素执行回调函数。
+
+```jsx
+const result = compose(fn1, fn2, fn3)(10)
+```
+
+写成如上方式来说的话，就是参数10首先传入函数fn1，该函数的返回值再传入函数fn2，fn2的返回值再传入函数fn3，最后fn3的返回值由compose函数返回赋值给变量result。
+
+我们使用compose函数来优雅地组合所有的逻辑，避免了定义中间变量，和嵌套调用的写法引起的嵌套地狱（类似回调地狱）。
+
+```jsx
+const convertToCivilianTime = (clockTime) =>
+  compose(appendAMPM, civilianHours)(clockTime)
+
+const doubleDigits = (civilianTime) =>
+  compose(
+    prependZero("hours"),
+    prependZero("minutes"),
+    prependZero("seconds"),
+  )(civilianTime)
+```
+
+- convertToCivilianTime 将appendAMPM和civilianHours组合为一个函数
+- doubleDigits 组合了三次prependZero函数，分别为时分秒添加前缀0
+
+最后整合全部的逻辑：
+
+```jsx
+const startTicking = () =>
+  setInterval(
+    compose(
+      clear,
+      getCurrentTime,
+      serializeClockTime,
+      convertToCivilianTime,
+      doubleDigits,
+      formatClock("hh:mm:ss tt"),
+      display(log),
+    ),
+    oneSecond(),
+  )
+```
+
+我们只需要调用该函数，即可输出时间
+
+```jsx
+startTicking()
+```
+
+## 总结
+
+两种写法虽然都能达到同样的效果，声明式却有着很多好处。首先，所有的函数（逻辑小块）都易于测试和重用，就算测试时除了bug，使用jest等测试工具也能轻易地找出是哪一个函数出了错。或是项目有变，增加了其他和与时间相关的功能，这些函数或多或少也能有所帮助。

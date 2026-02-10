@@ -1,0 +1,318 @@
+---
+title: "在 Linux 服务器上搭建 NextJS 生产环境"
+tags: ["Next.js", "Linux"]
+createdAt: "2026-01-01"
+summary: "想把 Next.js 项目从本地开发环境顺利推到生产服务器，却又不想完全依赖 Vercel 或 Netlify？本文介绍了如何将一个刚租好的服务器一步一步地打造成 Next.js 网站项目服务器，包括 Node、Nginx 和 PM2 等部署工具和 fail2ban 等安全工具。"
+---
+
+## 部署工具
+
+### Git
+
+Linux 服务器一般都会集成好 Git 工具，如果没有
+
+检查 Git 是否已经安装
+
+```shell
+git --version
+```
+
+如果显示版本号，则说明已经安装；若报错，则说明没有安装。可按照如下步骤安装：
+
+<CodeWithTabs>
+
+```shell !!tabs Debian/Ubuntu
+sudo apt update
+sudo apt install git
+```
+
+```shell !!tabs Fedora
+sudo dnf install git
+```
+
+```shell !!tabs CentOS
+sudo yum install git # 旧版本 CentOS
+sudo dnf install git # 新版本 CentOS
+```
+
+</CodeWithTabs>
+
+#### 添加 SSH 密钥
+
+Github 官方提供了如何生成新的 SSH 密钥并添加到 ssh-agent 中的[文档](https://docs.github.com/en/authentication/connecting-to-github-with-ssh/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent?platform=linux)。
+
+##### 生成 SSH 密钥
+
+1. 打开控制台
+
+2. 复制粘贴以下命令，并邮箱修改成自己的
+
+   ```shell
+   ssh-keygen -t ed25519 -C "your_email@example.com"
+   ```
+
+   该命令用于生成 SSH 密钥，并使用邮箱作为标签。
+
+   ```shell
+   > Generating public/private ALGORITHM key pair.
+   ```
+
+   当提示输入密钥的保存位置时，可直接回车保存到默认位置。
+
+   ```shell
+   > Enter a file in which to save the key (/home/YOU/.ssh/id_ALGORITHM):[Press enter]
+   ```
+
+3. 出现提示时，输入密码
+
+   ```shell
+   > Enter passphrase (empty for no passphrase): [Type a passphrase]
+   > Enter same passphrase again: [Type passphrase again]
+   ```
+
+##### 将 SSH 密钥添加到 ssh-agent
+
+在添加之前，先检查是否有 SSH 密钥存在。
+
+1. 在后台启动 ssh-agent
+
+   ```shell
+   $ eval "$(ssh-agent -s)"
+   > Agent pid 59566
+   ```
+
+   这会输出 ssh-agent 的进程 id
+
+2. 将 SSH 密钥添加到 ssh-agent 中
+
+   ```shell
+   ssh-add ~/.ssh/id_ed25519
+   ```
+
+3. 将 SSH 公钥添加到 GitHub 中
+
+##### 将 SSH 公钥添加到 GitHub 中
+
+1. 将 SSH 公钥复制到粘贴板
+
+   ```shell
+   $ cat ~/.ssh/id_ed25519.pub
+   ```
+
+   上述命令会将 SSH 公钥的内容输出在控制台上，复制。
+
+2. 在浏览器中打开 Github 网站，点击个人头像，之后点击 `Setting`
+3. 在左侧面板的 Access 一栏中，找到 `SSH and GPG keys`
+4. 点击 `New SSH key` 或 `Add SSH key`
+5. 在 Title 输入框中，输入描述该公钥的标签。如 "Personal laptop"
+6. 选择钥匙类型 一般为 Authentication Key
+7. 在 Key 输入框中，粘贴从控制台上复制过来的内容
+8. 点击 `Add SSH key`
+
+### Node
+
+推荐使用 nvm 安装 node。
+
+#### 通过 nvm 安装
+
+##### 安装 nvm
+
+1. 打开控制台
+2. 安装必要工具
+
+   ```shell
+   sudo apt update
+   sudo apt install curl git
+   ```
+
+3. 执行安装命令
+
+   ```shell
+   curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.5/install.sh | bash
+   ```
+
+   请检查[官网](https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script)的最新版本，并将版本号替换成最新版本的版本号。
+
+4. 重新加载 shell 配置
+
+   手动重新加载 shell 配置
+
+   ```shell
+   source ~/.bashrc
+   ```
+
+5. 验证
+
+   ```shell
+   nvm --version
+   ```
+
+##### 通过 nvm 安装 node
+
+1. 列出所有可用版本
+
+   ```shell
+   nvm ls-remote
+   ```
+
+2. 安装 node
+   1. 安装 LTS 版本
+
+   ```shell
+   nvm install --lts
+   ```
+
+   2. 安装最新版本
+
+   ```shell
+   nvm install node
+   ```
+
+   3. 安装特定版本
+
+   ```shell
+   nvm install v20.18.0
+   ```
+
+3. 验证安装情况
+
+   ```shell
+   node -v
+   npm -v
+   ```
+
+##### 通过 nvm 管理 node
+
+可以通过 nvm 安装多个版本的 node
+
+- 切换到特定版本
+
+  ```shell
+  nvm use v20.18.0
+  ```
+
+- 设置别名
+
+  ```shell
+  nvm alias default v20.18.0
+  ```
+
+- 列出系统上所有安装过的版本
+
+  ```shell
+  nvm ls
+  ```
+
+- 卸载特定版本
+
+  ```shell
+  nvm uninstall v20.18.0
+  ```
+
+### PM2
+
+PM2 是 node 上的一个包，也就是说，安装 PM2 需要先安装 node。
+
+以下是来自[官网](https://pm2.io/docs/runtime/guide/installation/)的安装步骤。
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm add pm2 --global
+```
+
+```shell !!tabs npm
+npm install pm2 -g
+```
+
+```shell !!tabs yarn
+yarn global add pm2
+```
+
+</CodeWithTabs>
+
+### Nginx
+
+<CodeWithTabs>
+
+```shell !!tabs Ubuntu/Debian
+sudo apt update
+sudo apt install nginx -y
+sudo systemctl enable --now nginx
+```
+
+```shell !!tabs Red Hat/CentOS/Rocky
+sudo dnf update
+sudo dnf install nginx -y
+sudo systemctl enable --now nginx
+```
+
+</CodeWithTabs>
+
+检查 Nginx 服务状态
+
+```shell
+sudo systemctl status nginx
+```
+
+### Docker
+
+<CodeWithTabs>
+
+```shell !!tabs Ubuntu/Debian
+sudo apt update
+sudo apt install ca-certificates curl gnupg -y
+
+# 创建 keyrings 目录
+sudo install -m 0755 -d /etc/apt/keyrings
+
+# 添加 Docker 官方 GPG 密钥
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# 添加 Docker 仓库（自动检测发行版）
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 更新仓库并安装 Docker
+sudo apt update
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
+
+# 启动 Docker 并设置开机自启
+sudo systemctl start docker
+sudo systemctl enable docker
+
+# 测试（非 root 用户运行 docker 无需 sudo）
+sudo usermod -aG docker $USER  # 退出重新登录生效
+docker run hello-world
+```
+
+</CodeWithTabs>
+
+## 安全工具
+
+### Fail2ban
+
+<CodeWithTabs>
+
+```shell !!tabs Ubuntu/Debian
+apt install fail2ban -y
+```
+
+```shell !!tabs CentOS/Rocky
+yum install fail2ban -y || dnf install fail2ban -y
+```
+
+</CodeWithTabs>
+
+之后新建或修改配置文件 `/etc/fail2ban/jail.local`
+
+```txt
+[sshd]
+enabled = true
+port = 22222          # 改成你设置的 SSH 端口
+maxretry = 3          # 最多失败 3 次
+bantime = 86400       # 封禁 24 小时 (单位为秒)
+ignoreip = 127.0.0.1  # 你的IP
+```

@@ -1,0 +1,273 @@
+---
+title: "构建类型安全的 NextJS 全栈项目流程和配置"
+tags:
+  [
+    "Next.js",
+    "Tailwind CSS",
+    "tRPC",
+    "Drizzle",
+    "React Hook Form",
+    "TanStack Form",
+  ]
+createdAt: "2026-01-01"
+summary: "本文列出了构建基于 Next.js 类型安全的全栈项目所需的各种依赖，包括 Tailwind CSS 和 UI 库 shadcn、负责前后端通信的 tRPC、确保数据库与前端类型一致的 Drizzle ORM 以及用于管理表单的 React Hook Form 或 TanStack Form。"
+---
+
+## 初始化项目
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm create next-app@latest
+```
+
+```shell !!tabs npm
+npx create-next-app@latest
+```
+
+```shell !!tabs yarn
+yarn create next-app@latest
+```
+
+</CodeWithTabs>
+
+之后，控制台中会逐个显示关于配置的提问：
+
+- 项目名称
+
+  ```shell noCopyButton
+  What is your project named?  my-app
+  ```
+
+- 配置
+
+  如果之前使用该命令初始化过其他项目，可以选择是否使用相同的配置，或是使用 Next.js 推荐的默认配置。
+
+  ```shell noCopyButton
+  Would you like to use the recommended Next.js defaults?
+    Yes, use recommended defaults - TypeScript, ESLint, Tailwind CSS, App Router, Turbopack
+    No, reuse previous settings
+  → No, customize settings - Choose your own preferences
+  ```
+
+- 是否使用 TypeScript
+
+  ```shell
+  Would you like to use TypeScript?
+    No
+  → Yes
+  ```
+
+- 代码检查工具
+
+  ```shell
+  Which linter would you like to use?
+  → ESLint
+    Biome
+    None
+  ```
+
+- 启用 React Compiler
+
+  ```shell
+  Would you like to use React Compiler?
+    No
+  → Yes
+  ```
+
+- 是否使用 Tailwind CSS
+
+  ```shell
+  Would you like to use Tailwind CSS?
+    No
+  → Yes
+  ```
+
+- 文件结构
+
+  ```shell
+  Would you like your code inside a `src/` directory?
+    No
+  → Yes
+  ```
+
+- 路由方案
+
+  ```shell
+  Would you like to use App Router (recommended)?
+    No
+  → Yes
+  ```
+
+- 自定义根目录别名
+
+  ```shell
+  Would you like to customize the import alias (`@/*` by default)?
+  → No
+    Yes
+  ```
+
+## IDE 配置
+
+在 VS Code 中，可以安装 [Prettier](https://prettier.io/) 插件来开启在复制代码、保存文件时格式化代码，用于保持代码格式美观和一致。
+
+在根目录创建 `.prettierrc` 文件，规则为不添加末尾的分号。
+
+```json title=".prettierrc" showCopyButton
+{
+  "semi": false
+}
+```
+
+## Tailwind CSS
+
+### 类名排序
+
+项目初始化时已经安装好了 `tailwindcss`。在书写 className 属性时，过长的类名可能会使维护变得困难。
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm add -D prettier prettier-plugin-tailwindcss
+```
+
+```shell !!tabs npm
+npm install -D prettier prettier-plugin-tailwindcss
+```
+
+</CodeWithTabs>
+
+安装 [prettier-plugin-tailwindcss](https://tailwindcss.com/blog/automatic-class-sorting-with-prettier) 并配置 `.prettierrc` 能使在触发格式化代码时重新排序 className 中的类名。
+
+在 `.prettierrc` 中添加 plugins 属性
+
+```json title=".prettierrc" showCopyButton
+{
+  // ...
+  "plugins": ["prettier-plugin-tailwindcss"]
+}
+```
+
+### 版式
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm add -D @tailwindcss/typography
+```
+
+```shell !!tabs npm
+npm install -D @tailwindcss/typography
+```
+
+</CodeWithTabs>
+
+## shadcn
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm dlx shadcn@latest init
+```
+
+```shell !!tabs npm
+npx shadcn@latest init
+```
+
+```shell !!tabs yarn
+yarn shadcn@latest init
+```
+
+```shell !!tabs bun
+bunx --bun shadcn@latest init
+```
+
+</CodeWithTabs>
+
+之后控制台中会逐个显示关于配置的提问：
+
+- 风格
+
+  ```shell
+  Which style would you like to use?
+  → Default
+    New York
+  ```
+
+- 基础色
+
+  ```shell
+  Which color would you like to use as base color?
+    Slate
+    Zinc
+  → Neutral
+    Gray
+    Stone
+  ```
+
+- 是否使用 css 变量来命名颜色
+
+  ```shell
+  Would you like to use CSS variables for colors?
+  → Yes
+    No
+  ```
+
+- 全局 CSS 文件
+
+  ```shell
+  Where is your global CSS file?
+  → Yes
+    No
+  ```
+
+  通常自动检测正确，直接回车即可；如果路径不对，手动输入你的全局 CSS 文件路径
+
+- UI 文件夹别名
+
+  推荐保持默认 `@/*` 风格，与 Next.js 一致
+
+## tRPC
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm add @trpc/server @trpc/client @trpc/react-query @tanstack/react-query
+```
+
+</CodeWithTabs>
+
+tRPC 底层使用 TanStack Query 进行管理状态，故需要安装 `@tanstack/react-query`。
+
+## Drizzle ORM
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm add drizzle-orm pg
+pnpm add -D drizzle-kit @types/pg
+```
+
+</CodeWithTabs>
+
+## 表单
+
+### React Hook Form
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm add react-hook-form
+```
+
+</CodeWithTabs>
+
+### Tanstack Form
+
+<CodeWithTabs>
+
+```shell !!tabs pnpm
+pnpm add @tanstack/react-form
+```
+
+</CodeWithTabs>

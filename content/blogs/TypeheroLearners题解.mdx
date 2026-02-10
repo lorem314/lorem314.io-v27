@@ -1,0 +1,412 @@
+---
+title: "Typehero Learners 题解"
+tags: ["TypeScript", "typehero.dev"]
+createdAt: "2026-01-01"
+summary: "Typehero.dev Learners 题目讲解和答案分析"
+---
+
+## Readonly
+
+不使用 `Readonly` 实现将对象类型加上只读限制。
+
+TS 中专门有一个内置类型 `Readonly<T>` ，能将传入的类型加上 readonly 限制。
+
+从而使有着该类型的变量无法修改其上的属性：
+
+```ts
+interface Todo {
+  title: string
+  description: string
+}
+
+const todo: MyReadonly<Todo> = {
+  title: "Hey",
+  description: "foobar",
+}
+
+todo.title = "Hello" // Error: cannot reassign a readonly property
+todo.description = "barFoo" // Error: cannot reassign a readonly property
+```
+
+### 答案及分析
+
+TS 中有关键字 readonly 用于将对象中的属性设置为只读模式，之后配合映射即可。
+
+```ts
+type MyReadonly<T> = {
+  readonly [K in keyof T]: T[K]
+}
+```
+
+## Tuple to Object
+
+将给定的数组类型转化为对象类型，对象类型的键和值均为数组类型中对应的元素值。
+
+如一个字符串数组类型：
+
+```ts
+const tuple = ["tesla", "model 3", "model X", "model Y"] as const
+
+type result = TupleToObject<typeof tuple>
+// expected { 'tesla': 'tesla', 'model 3': 'model 3', 'model X': 'model X', 'model Y': 'model Y'}
+```
+
+### 答案及分析
+
+由于数组中的元素类型需要作为对象类型的键类型，TS 中有 `PropertyKey`（也就是 `string | number | symbol`），专门指代可以作为键的类型。
+
+访问数组类型的 `[number]` 属性，能将数组类型中的所有元素的类型变为集合。
+
+```ts
+type TupleToObject<T extends readonly PropertyKey[]> = {
+  [Property in T[number]]: Property
+}
+```
+
+## First of Array
+
+实现 `First<T>` 类型，用于获取数组类型的首个元素的类型。
+
+```ts
+type arr1 = ["a", "b", "c"]
+type arr2 = [3, 2, 1]
+
+type head1 = First<arr1> // expected to be 'a'
+type head2 = First<arr2> // expected to be 3
+```
+
+### 答案及分析
+
+核心思路就是，先检查数组中是否有元素，有就检查首个元素，没有就返回 `never`。
+
+检查数组是否为空有三种方法：
+
+- 检查子集：空集为空集的子集，用 `T extends []` 检查 `T` 是否为空集
+
+  ```ts
+  type First<T extends any[]> = T extends [] ? never : T[0]
+  ```
+
+- 检查 `length` 属性：直接访问数组类型的 length 属性，检查其是否为 0
+
+  ```ts
+  type First<T extends any[]> = T["length"] extends 0 ? never : T[0]
+  ```
+
+- 用 `infer` 关键字配合 `...` 剩余类型表达式获取首个元素的类型
+
+  ```ts
+  type First<T extends any[]> = T extends [infer First, ...any[]]
+    ? First
+    : never
+  ```
+
+## Length of Tuple
+
+对于给定的元组类型，实现 `Length<T>` 获取元组的长度。
+
+例如：
+
+```ts
+type tesla = ["tesla", "model 3", "model X", "model Y"]
+type spaceX = [
+  "FALCON 9",
+  "FALCON HEAVY",
+  "DRAGON",
+  "STARSHIP",
+  "HUMAN SPACEFLIGHT",
+]
+
+type teslaLength = Length<tesla> // expected 4
+type spaceXLength = Length<spaceX> // expected 5
+```
+
+### 答案及分析
+
+用 `extends` 限制传入的泛型为数组类型，之后直接访问 `length` 属性。
+
+```ts
+type Length<T extends readonly any[]> = T["length"]
+```
+
+## Exclude
+
+实现内置类型 `Exclude<T, U>`，从 T 中移除 U 中的属性。
+
+例如：
+
+从 `"a" | "b" | "c"` 中移除 `"a"` 得到 `"b" | "c"`。
+
+```ts
+type Result = MyExclude<"a" | "b" | "c", "a"> // 'b' | 'c'
+```
+
+### 答案及分析
+
+之前说过 extends 关键字可以用来约束传入的泛型的类型，这里再介绍另一个用法：遍历集合。
+
+当 extends 的左侧是集合类型时，会逐个判断其中的每个成员是否 `extends U`，最后再将得到的结果合并成集合类型。
+
+```ts
+type MyExclude<T, U> = T extends U ? never : T
+```
+
+## Awaited
+
+假设有一个类型，被包裹在另一个类型中，类似 Promise，该如何获得最里面的类型？
+
+```ts
+type ExampleType = Promise<string>
+
+type Result = MyAwaited<ExampleType> // string
+```
+
+### 答案及分析
+
+题目的目的是实现内置类型 `Awaited<T>`，我们一步一步来：
+
+1. 首先，只打开一层 Promise：
+
+   ```ts
+   type MyAwaited<T> = T extends Promise<infer Inner> ? Inner : never
+   ```
+
+   用 infer 关键字推断 Promise 中的类型
+
+2. 再多想一步，Promise 的返回值类型还可能是 Promise 类型
+
+   ```ts
+   type MyAwaited<T extends Promise<any>> =
+     T extends Promise<infer Inner>
+       ? Inner extends Promise<any>
+         ? MyAwaited<Inner>
+         : Inner
+       : never
+   ```
+
+   再多加一步判断 Inner 是否也是 Promise 类型，若是则递归调用 MyAwaited 获取返回值类型。
+
+3. 最后，测试用例中还需要支持 PromiseLike 类型，即有 then 方法的对象
+
+   ```ts
+   type MyAwaited<T extends PromiseLike<any>> =
+     T extends PromiseLike<infer Inner>
+       ? Inner extends PromiseLike<any>
+         ? MyAwaited<Inner>
+         : Inner
+       : never
+   ```
+
+## If
+
+实现 `If<C, T, F>` 类型。C 是条件，如果条件满足，返回 T，否则返回 F。
+
+```ts
+type A = If<true, "a", "b"> // expected to be 'a'
+type B = If<false, "a", "b"> // expected to be 'b'
+```
+
+### 答案
+
+```ts
+type If<C extends boolean, T, F> = C extends true ? T : F
+```
+
+## Concat
+
+实现类似 JS 中 `Array.concat` 的方法，将两个数组合并，例如：
+
+```ts
+type Result = Concat<[1], [2]> // expected to be [1, 2]
+```
+
+### 答案
+
+```ts
+type Concat<T extends readonly unknown[], U extends readonly unknown[]> = [
+  ...T,
+  ...U,
+]
+```
+
+## Includes
+
+实现类似 JS 中 `Array.includes` 的方法，判断数组元素中是否包含某个特定的类型，例如：
+
+```ts
+type isPillarMen = Includes<["Kars", "Esidisi", "Wamuu", "Santana"], "Dio"> // expected to be `false`
+```
+
+### 答案及分析
+
+你可能会想到用 `extends`，用 `infer` 和 `...` 提取数组的首个元素，再判断是否相等，否的话用递归继续判断剩余的元素：
+
+```ts
+type Includes<T extends readonly any[], U> = T extends [infer F, ...infer Rest]
+  ? U extends F
+    ? true
+    : Includes<Rest, U>
+  : false
+```
+
+如上代码确实能通过大部分的测试用例，但仍有一些比较刁钻的就...：
+
+```ts
+Expect<Equal<Includes<[{}], { a: "A" }>, false>>
+Expect<Equal<Includes<[boolean, 2, 3, 5, 6, 7], false>, false>>
+Expect<Equal<Includes<[true, 2, 3, 5, 6, 7], boolean>, false>>
+Expect<Equal<Includes<[{ a: "A" }], { readonly a: "A" }>, false>>
+Expect<Equal<Includes<[{ readonly a: "A" }], { a: "A" }>, false>>
+Expect<Equal<Includes<[1], 1 | 2>, false>>
+Expect<Equal<Includes<[1 | 2], 1>, false>>
+```
+
+本题的最大难点是，如何判断两个类型相等。实现一个 Equal 类型函数，用于判断传入的两个类型是否相等。
+
+> 仔细观察，测试用例中引入了 Equal 类型，将鼠标移到文本上方，会显示出 typehero 官方是如何实现 Equal 类型函数的。
+
+将所有用 extends 判断相等的地方替换为 Equal，即可通过全部测试用例。
+
+> 关于判断类型相等的 Equal 类型函数的实现方法，请参考这篇文章。
+
+```ts
+type Equal<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2
+    ? true
+    : false
+
+type Includes<T extends any[], U> = T extends [infer First, ...infer Rest]
+  ? Equal<U, First> extends true
+    ? true
+    : Includes<Rest, U>
+  : false
+```
+
+## Push
+
+实现 `Array.push` 类型函数。例如：
+
+```ts
+type Result = Push<[1, 2], "3"> // [1, 2, '3']
+```
+
+### 答案
+
+```ts
+type Push<T extends any[], U> = [...T, U]
+```
+
+## Unshift
+
+实现 `Array.unshift` 类型函数。例如：
+
+```ts
+type Result = Unshift<[1, 2], 0> // [0, 1, 2]
+```
+
+### 答案
+
+```ts
+type Unshift<T extends unknown[], U> = [U, ...T]
+```
+
+## Parameters
+
+实现 `Parameters<T>` 内置类型，用于提取函数类型的所有参数的类型。
+
+```ts
+const foo = (arg1: string, arg2: number): void => {}
+
+type FunctionParamsType = MyParameters<typeof foo>
+// [arg1: string, arg2: number]
+```
+
+### 答案及分析
+
+在定义泛型时，限制传入的 T 为函数类型。之后判断 T 是否符合函数类型，同时用 infer 获取所有参数的类型。类似 JS 中的剩余参数，TS 中的剩余类型也是数组类型。
+
+```ts
+type MyParameters<T extends (...args: any[]) => any> = T extends (
+  ...args: infer Args
+) => any
+  ? Args
+  : []
+```
+
+## The `Pick` builtin
+
+`Pick` 是个很常用的内置类型函数。
+
+如下是一个用于描述宝可梦的类型，包括名称、属性、弱点等。
+
+```ts
+interface Pokemon {
+  name: string
+  type: string
+  hitPoints: number
+  stage: string
+  evolutionStage: number
+  attacks: string[]
+  weakness: string
+  resilience: string
+}
+```
+
+假设有一个函数，只用到其中的两个属性：
+
+```ts
+const pickYourPokemon = (pokemon: Pokemon) => {
+  const { type, name } = pokemon
+
+  return `You picked the ${type}-type Pokemon ${name}!`
+}
+```
+
+调用函数时：
+
+```ts
+const pikachu = {
+  name: "Pikachu",
+  type: "Electric",
+}
+console.log(pickYourPokemon(pikachu))
+//                          ^?
+// Argument of type '{ name: string; type: string; }' is not assignable to parameter of type 'Pokemon'.
+```
+
+报错说，参数的属性不全，即便函数中只是用了两个属性。
+
+比起在定义一遍这两个参数：
+
+```ts
+- const pickYourPokemon = (pokemon: Pokemon) => {
++ const pickYourPokemon = (pokemon: { name: string, type: string }) => {
+```
+
+或是只传入两个用到的属性：
+
+```ts
+- const pickYourPokemon = (pokemon: Pokemon) => {
++ const pickYourPokemon = (name: string, type: string) => {
+```
+
+还有一种更加便捷的方式：用 `Pick`。
+
+```ts
+type BasicPokemonInfo = Pick<Pokemon, "name" | "type">
+```
+
+```ts
+- const pickYourPokemon = (pokemon: Pokemon) => {
++ const pickYourPokemon = (pokemon: BasicPokemonInfo) => {
+```
+
+### 答案及分析
+
+通过 in 关键字遍历第二个参数的集合，并将对应属性的类型从 T 中提取出来。
+
+```ts
+type MyPick<T, K extends keyof T> = {
+  [Key in K]: T[Key]
+}
+```
