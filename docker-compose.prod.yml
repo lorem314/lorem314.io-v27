@@ -14,6 +14,11 @@ services:
       - /etc/letsencrypt/live/lorem314.site/fullchain.pem:/usr/share/elasticsearch/config/certs/fullchain.pem:ro
       - /etc/letsencrypt/live/lorem314.site/privkey.pem:/usr/share/elasticsearch/config/certs/privkey.pem:ro
 
+    deploy:
+      resources:
+        limits:
+          memory: 3g
+
   kibana:
     deploy:
       replicas: 0
