@@ -3,7 +3,7 @@ services:
   es01:
     environment:
       # 生产开启安全（需要用户名/密码或 API Key）
-      - xpack.security.enabled=false
+      - xpack.security.enabled=true
 
       # 可选：如果生产想用 HTTPS，加以下（需挂载证书）
       - xpack.security.http.ssl.enabled=false

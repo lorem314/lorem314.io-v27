@@ -1,10 +1,10 @@
-import { Client } from "@elastic/elasticsearch"
+// import { Client } from "@elastic/elasticsearch"
 
-// import { client } from "@/lib/elasticsearch"
+import { client } from "@/lib/elasticsearch"
 
-const client = new Client({
-  node: "http://localhost:9200",
-})
+// const client = new Client({
+//   node: "http://localhost:9200",
+// })
 
 async function main() {
   // 检查信息

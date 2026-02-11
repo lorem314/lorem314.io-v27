@@ -1,14 +1,12 @@
 import "dotenv/config"
 
-import fs from "fs"
-
 import { Client } from "@elastic/elasticsearch"
-import { isDev, isProd } from "./env"
+import { isDev } from "./env"
 
 const ELASTICSEARCH_NODE = process.env.ELASTICSEARCH_NODE
 const ELASTICSEARCH_USERNAME = process.env.ELASTICSEARCH_USERNAME
 const ELASTICSEARCH_PASSWORD = process.env.ELASTICSEARCH_PASSWORD
-const ELASTICSEARCH_CA_PATH = process.env.ELASTICSEARCH_CA_PATH || ""
+// const ELASTICSEARCH_CA_PATH = process.env.ELASTICSEARCH_CA_PATH || ""
 
 if (!isDev) {
   if (!ELASTICSEARCH_NODE) {
@@ -20,23 +18,23 @@ if (!isDev) {
   if (!ELASTICSEARCH_PASSWORD) {
     throw new Error("环境变量 ELASTICSEARCH_PASSWORD 未设置")
   }
-  if (!ELASTICSEARCH_CA_PATH) {
-    throw new Error("环境变量 ELASTICSEARCH_CA_PATH 未设置")
-  }
+  // if (!ELASTICSEARCH_CA_PATH) {
+  //   throw new Error("环境变量 ELASTICSEARCH_CA_PATH 未设置")
+  // }
 }
 
 const client = new Client({
   node: ELASTICSEARCH_NODE,
   auth: isDev
-    ? { apiKey: "" }
+    ? undefined
     : {
         username: ELASTICSEARCH_USERNAME!,
         password: ELASTICSEARCH_PASSWORD!,
       },
-  tls: {
-    rejectUnauthorized: !isDev,
-    ca: isDev ? undefined : fs.readFileSync(ELASTICSEARCH_CA_PATH),
-  },
+  // tls: {
+  //   rejectUnauthorized: !isDev,
+  //   ca: isDev ? undefined : fs.readFileSync(ELASTICSEARCH_CA_PATH),
+  // },
 })
 
 export { client }
