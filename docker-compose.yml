@@ -6,7 +6,7 @@ services:
     container_name: es01
     environment:
       - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms1g -Xmx1g"
+      - "ES_JAVA_OPTS=-Xms1536m -Xmx1536m"
     ulimits:
       memlock: -1
     volumes:
