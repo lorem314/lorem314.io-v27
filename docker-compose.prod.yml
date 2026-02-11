@@ -2,9 +2,11 @@ services:
 
   es01:
     environment:
-      - xpack.security.enabled=true # 生产开启安全（需要用户名/密码或 API Key）
+      # 生产开启安全（需要用户名/密码或 API Key）
+      - xpack.security.enabled=true
+
       # 可选：如果生产想用 HTTPS，加以下（需挂载证书）
-      # - xpack.security.http.ssl.enabled=true
+      - xpack.security.http.ssl.enabled=true
       # - xpack.security.http.ssl.keystore.path=/usr/share/elasticsearch/config/certs/http.p12
       # volumes:
       #   - /path/to/prod/certs:/usr/share/elasticsearch/config/certs:ro
