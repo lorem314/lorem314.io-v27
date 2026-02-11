@@ -3,16 +3,16 @@ services:
   es01:
     environment:
       # 生产开启安全（需要用户名/密码或 API Key）
-      - xpack.security.enabled=true
+      - xpack.security.enabled=false
 
       # 可选：如果生产想用 HTTPS，加以下（需挂载证书）
-      - xpack.security.http.ssl.enabled=true
-      - xpack.security.http.ssl.certificate=/usr/share/elasticsearch/config/certs/fullchain.pem
-      - xpack.security.http.ssl.key=/usr/share/elasticsearch/config/certs/privkey.pem
+      - xpack.security.http.ssl.enabled=false
+      # - xpack.security.http.ssl.certificate=/usr/share/elasticsearch/config/certs/fullchain.pem
+      # - xpack.security.http.ssl.key=/usr/share/elasticsearch/config/certs/privkey.pem
 
-    volumes:
-      - /etc/letsencrypt/live/lorem314.site/fullchain.pem:/usr/share/elasticsearch/config/certs/fullchain.pem:ro
-      - /etc/letsencrypt/live/lorem314.site/privkey.pem:/usr/share/elasticsearch/config/certs/privkey.pem:ro
+      # volumes:
+      #   - /etc/letsencrypt/live/lorem314.site/fullchain.pem:/usr/share/elasticsearch/config/certs/fullchain.pem:ro
+      #   - /etc/letsencrypt/live/lorem314.site/privkey.pem:/usr/share/elasticsearch/config/certs/privkey.pem:ro
 
     deploy:
       resources:
