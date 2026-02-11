@@ -65,7 +65,11 @@ export function Footer() {
 
         <div className="">
           <p className="text-muted-foreground text-sm">
-            © {new Date().getFullYear()} ICP 备案号
+            {/* &#169; {new Date().getFullYear()}{" "} */}
+            互联网ICP备案：
+            <a href="https://beian.miit.gov.cn/" target="_blank">
+              京ICP备2024101464号-1
+            </a>
           </p>
         </div>
       </div>
