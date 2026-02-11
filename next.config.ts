@@ -5,7 +5,7 @@ const withMDX = createMDX()
 
 const nextConfig: NextConfig = {
   /* config options here */
-  reactStrictMode: false,
+  reactStrictMode: true,
   reactCompiler: true,
 }
 
