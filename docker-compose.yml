@@ -6,7 +6,7 @@ services:
     container_name: es01
     environment:
       - discovery.type=single-node
-      - "ES_JAVA_OPTS=-Xms1536m -Xmx1536m"
+      - "ES_JAVA_OPTS=-Xms768m -Xmx768m -XX:MaxDirectMemorySize=256m -XX:+UseG1GC -XX:G1HeapRegionSize=4m"
     ulimits:
       memlock: -1
     volumes:
