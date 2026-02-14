@@ -233,16 +233,17 @@ const Search = ({
                       </ItemContent>
 
                       <ol className="text-muted-foreground list-decimal pl-6">
-                        {hit.highlight?.["content.ngram"].map(
-                          (content, index) => {
-                            return (
-                              <li
-                                key={index}
-                                dangerouslySetInnerHTML={{ __html: content }}
-                              />
-                            )
-                          },
-                        )}
+                        {hit.highlight?.["content.ngram"] &&
+                          hit.highlight?.["content.ngram"].map(
+                            (content, index) => {
+                              return (
+                                <li
+                                  key={index}
+                                  dangerouslySetInnerHTML={{ __html: content }}
+                                />
+                              )
+                            },
+                          )}
                       </ol>
 
                       <ItemFooter>

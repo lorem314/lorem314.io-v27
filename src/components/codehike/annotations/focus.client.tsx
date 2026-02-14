@@ -43,10 +43,11 @@ function useScrollToFocus(ref: React.RefObject<HTMLPreElement>) {
       // console.log("top", top)
       // console.log("bottom", bottom)
 
-      const translateY =
-        (containerRect.height / 2 - (top + bottom) / 2) / containerRect.height
-
-      ref.current.style.transform = `translateY(${translateY * 100}%)`
+      // new added
+      // const translateY =
+      //   (containerRect.height / 2 - (top + bottom) / 2) / containerRect.height
+      // ref.current.style.transform = `translateY(${translateY * 100}%)`
+      // new added
 
       // scroll to the focused elements if any part of them is not visible
       if (bottom > containerRect.height || top < 0) {

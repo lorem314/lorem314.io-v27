@@ -18,6 +18,7 @@ export default async function Page(props: {
 
   if (blogPost.data.type === "scrollycoding") {
     // console.log("blogPost", blogPost)
+    // return <div>scrollycoding</div>
     return <Scrollycoding blogPost={blogPost} />
   }
 
