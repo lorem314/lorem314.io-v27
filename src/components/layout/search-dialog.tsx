@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { keepPreviousData } from "@tanstack/react-query"
-import { AlertCircleIcon, SearchIcon } from "lucide-react"
+import { AlertCircleIcon, SearchIcon, XIcon } from "lucide-react"
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -64,6 +64,7 @@ import { cn } from "@/lib/utils"
 import { useDebounce } from "@/hooks/use-debounce"
 import { useForm } from "@tanstack/react-form"
 import { trpc } from "@/trpc/client"
+import { useSearchHistory } from "@/hooks/use-search-history"
 
 export function SearchDialog() {
   const [open, setOpen] = React.useState(false)
@@ -95,13 +96,13 @@ export function SearchDialog() {
           <DialogTitle className="text-center">全站搜索</DialogTitle>
         </DialogHeader>
 
-        <div className="grow overflow-y-auto">
+        <div className="no-scrollbar relative grow overflow-y-auto">
           <Search setOpen={setOpen} />
         </div>
 
         <DialogFooter
           className={cn(
-            "text-muted-foreground bg-secondary rounded-b-xl pt-4 pb-4 text-sm sm:justify-center",
+            "text-muted-foreground bg-secondary rounded-b-lg pt-4 pb-4 text-sm sm:justify-center",
           )}
         >
           <div className="text-center">
@@ -120,6 +121,7 @@ const Search = ({
 }) => {
   const [search, setSearch] = React.useState("")
   const debouncedSearch = useDebounce(search, 500)
+  const history = useSearchHistory()
 
   const globalSearchQuery = trpc.search.useQuery(
     { search: debouncedSearch },
@@ -135,13 +137,14 @@ const Search = ({
   return (
     <Card
       className={cn(
-        "h-full grow gap-0 rounded-lg border-none bg-transparent p-0 shadow-none",
+        "shrink-0 grow gap-0 rounded-lg border-none bg-transparent p-0",
+        "relative z-50 shadow-none",
       )}
     >
-      <CardHeader className="flex px-0">
+      <CardHeader className="sticky top-0 flex rounded-t-lg px-0">
         <Input
           className={cn(
-            "rounded-b-none text-sm shadow-none",
+            "bg-card h-12 rounded-t-lg rounded-b-none text-sm shadow-none",
             "focus-visible:border-input",
             "focus-visible:ring-transparent",
             "focus-visible:ring-0",
@@ -151,8 +154,54 @@ const Search = ({
           onChange={(event) => setSearch(event.target.value)}
         />
       </CardHeader>
+
       <CardContent className="grow px-1 py-4">
-        {globalSearchQuery.isFetching ? (
+        {debouncedSearch.trim().length === 0 ? (
+          history.list.length === 0 ? (
+            <Empty>
+              <EmptyTitle className="text-muted-foreground">
+                暂无历史搜索记录
+              </EmptyTitle>
+            </Empty>
+          ) : (
+            <>
+              <CardTitle className="text-center">历史搜索记录</CardTitle>
+              <ItemGroup>
+                {history.list.map((item) => {
+                  return (
+                    <Item key={item.title}>
+                      <ItemContent>
+                        <Link
+                          href={`/blogs/${item.title.replaceAll(" ", "")}`}
+                          className="hover:no-underline"
+                        >
+                          <ItemTitle className="font-bold">
+                            {item.title}
+                          </ItemTitle>
+                          <ItemDescription>{item.summary}</ItemDescription>
+                        </Link>
+                      </ItemContent>
+                      <ItemActions>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="size-6 p-0"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            history.remove(item.title)
+                          }}
+                        >
+                          <XIcon className="size-4" />
+                        </Button>
+                      </ItemActions>
+                    </Item>
+                  )
+                })}
+              </ItemGroup>
+            </>
+          )
+        ) : globalSearchQuery.isFetching ? (
           <div className="flex h-full items-center justify-center">
             <Spinner className="text-muted-foreground size-8" />
           </div>
@@ -195,13 +244,21 @@ const Search = ({
                       ) || ""
                     : hit._source?.summary || ""
 
+                const title = hit._source?.title.replaceAll(" ", "") || ""
+                const href = `/blogs/${title}`
+
                 // return <pre>{JSON.stringify(hit, null, 2)}</pre>
+
                 return (
                   <Item key={hit._id} asChild>
                     <Link
-                      href={hit._source?.title.replaceAll(" ", "") || ""}
+                      href={href}
                       className="hover:no-underline"
                       onClick={() => {
+                        history.add({
+                          title: hit._source?.title || "",
+                          summary: hit._source?.summary || "",
+                        })
                         setOpen(false)
                       }}
                     >
@@ -215,7 +272,7 @@ const Search = ({
                       </ItemHeader>
 
                       <ItemContent>
-                        <p>
+                        <p className="leading-6">
                           {/* <Badge
                             variant="outline"
                             className="mr-1 rounded-sm"
@@ -240,19 +297,12 @@ const Search = ({
                                 <li
                                   key={index}
                                   dangerouslySetInnerHTML={{ __html: content }}
+                                  className="mt-1 leading-6"
                                 />
                               )
                             },
                           )}
                       </ol>
-
-                      <ItemFooter>
-                        {/* {hit._source?.createdAt
-                          ? new Date(
-                              hit._source?.createdAt,
-                            ).toLocaleDateString()
-                          : null} */}
-                      </ItemFooter>
                     </Link>
                   </Item>
                 )
@@ -262,5 +312,13 @@ const Search = ({
         )}
       </CardContent>
     </Card>
+  )
+}
+
+const SearchHistory = () => {
+  return (
+    <div>
+      <div>SearchHistory</div>
+    </div>
   )
 }

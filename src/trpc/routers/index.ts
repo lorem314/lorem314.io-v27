@@ -86,7 +86,7 @@ export const appRouter = createTRPCRouter({
         },
       })
 
-      console.log("result", result)
+      // console.log("result", result)
 
       return { result }
     }),
